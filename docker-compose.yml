@@ -1,0 +1,16 @@
+services:
+  redis-cache:
+    image: redis:7-alpine
+    container_name: ktech_bot_redis
+    ports:
+      - "6379:6379"
+
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: ktech_bot_postgres
+    environment:
+      POSTGRES_USER: ktech_admin
+      POSTGRES_PASSWORD: ktech_super_password
+      POSTGRES_DB: ktech_core_db
+    ports:
+      - "5432:5432"
