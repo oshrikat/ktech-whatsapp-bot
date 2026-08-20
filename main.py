@@ -2,7 +2,7 @@ from fastapi import FastAPI, Response
 from controllers import webhook_controller
 
 # אתחול האפליקציה עם שם גרסה מסודר שיופיע בתיעוד
-app = FastAPI(title="K-tech WhatsApp Bot API", version="1.0")
+app = FastAPI(title="K-tech WhatsApp Bot API", version="1.0") # ready for prodction - thanks to god... (:
 
 # מחברים את ה-Controller שיצרנו לשרת המרכזי
 app.include_router(webhook_controller.router)

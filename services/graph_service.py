@@ -10,7 +10,7 @@ checkpointer = UpstashRedisSaver.from_env()
 def cut_if_needed(messages: list) -> list:
     # אם יש פחות מ-11 הודעות (10 היסטוריה + 1 חדשה), אין צורך לכווץ
     if len(messages) < 11:
-        return messages
+        return messages   
         
     print("🔄 Memory limit reached. Summarizing past 10 messages...")
     
