@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Request, HTTPException, Response, BackgroundTasks
 from services.graph_service import ktech_bot_graph
 from services.whatsapp_service import whatsapp_sender
+import os
 
 router = APIRouter(prefix="/webhook", tags=["WhatsApp Webhook"])
 
-VERIFY_TOKEN = "ktech_secure_token_123"
+VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN", "ktech_secure_token_123")
 
 # --- פונקציית הרקע שתרוץ מאחורי הקלעים ---
 def process_ai_and_reply(sender_phone: str, message_body: str):
@@ -36,6 +37,7 @@ def process_ai_and_reply(sender_phone: str, message_body: str):
 
 # --- הראוטרים שלנו ---
 @router.get("/")
+@router.get("")
 async def verify_webhook(request: Request):
     mode = request.query_params.get("hub.mode")
     token = request.query_params.get("hub.verify_token")

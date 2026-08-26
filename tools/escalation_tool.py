@@ -1,8 +1,8 @@
 from services.whatsapp_service import whatsapp_sender
+import os
 
-# המספר של אבא שלך (מנהל המעבדה). 
-MANAGER_PHONE_NUMBER = "972526722223" # מס' אבא - טלפון ישן
-MANAGER_PHONE_NUMBER2 = "972534299919" # מס' אבא - טלפון ישן
+# המספר של המנהל. 
+MANAGER_PHONE_NUMBER = os.getenv("MANAGER_PHONE_NUMBER")
 
 def escalate_to_human(customer_phone: str, summary: str) -> str:
     """
