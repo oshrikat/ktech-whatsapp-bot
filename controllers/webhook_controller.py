@@ -107,7 +107,7 @@ def verify_sms_signature(timestamp: str, signature: str, secret: str) -> bool:
         print(f"Error verifying signature: {e}")
         return False
 
-@router.post("/webhook/sms/inbound")
+@router.post("/sms/inbound")
 async def receive_sms(request: Request):
     """נקודת קצה לקליטת הודעות SMS ממכשיר ה-Gateway"""
     raw_body = await request.body()
