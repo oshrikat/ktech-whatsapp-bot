@@ -11,7 +11,7 @@ router = APIRouter(prefix="/webhook", tags=["WhatsApp Webhook"])
 
 VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN", "ktech_secure_token_123")
 
-SMS_SECRET = "ktech_secret_2026"
+SMS_SECRET = "123"
 
 # --- פונקציית הרקע שתרוץ מאחורי הקלעים ---
 def process_ai_and_reply(sender_phone: str, message_body: str):
