@@ -7,6 +7,8 @@ router = APIRouter(prefix="/webhook", tags=["WhatsApp Webhook"])
 
 VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN", "ktech_secure_token_123")
 
+SMS_SECRET = "ktech_secret_2026"
+
 # --- פונקציית הרקע שתרוץ מאחורי הקלעים ---
 def process_ai_and_reply(sender_phone: str, message_body: str):
     """
@@ -87,3 +89,50 @@ async def receive_message(request: Request, background_tasks: BackgroundTasks):
     except Exception as e:
         print(f"Error parsing incoming webhook: {e}")
         return {"status": "error"}
+
+def verify_sms_signature(timestamp: str, signature: str, secret: str) -> bool:
+    """פונקציה לאימות חתימת HMAC של SmsForwarder"""
+    try:
+        # יצירת המחרוזת לחתימה לפי התקן של האפליקציה
+        message = f"{timestamp}\n{secret}".encode('utf-8')
+        secret_bytes = secret.encode('utf-8')
+        
+        # חישוב החתימה הדיגיטלית
+        signature_mac = hmac.new(secret_bytes, message, digestmod=hashlib.sha256).digest()
+        expected_signature = base64.b64encode(signature_mac).decode('utf-8')
+        
+        # השוואה בטוחה של החתימות
+        return hmac.compare_digest(expected_signature, signature)
+    except Exception as e:
+        print(f"Error verifying signature: {e}")
+        return False
+
+@router.post("/webhook/sms/inbound")
+async def receive_sms(request: Request):
+    """נקודת קצה לקליטת הודעות SMS ממכשיר ה-Gateway"""
+    raw_body = await request.body()
+    raw_str = raw_body.decode('utf-8')
+    
+    # פירוק המידע המקודד
+    parsed_data = urllib.parse.parse_qs(raw_str)
+    
+    sender = parsed_data.get('from', ['Unknown'])[0]
+    content = parsed_data.get('content', ['No content'])[0]
+    timestamp = parsed_data.get('timestamp', [''])[0]
+    signature = parsed_data.get('sign', [''])[0]
+    
+    # 1. שכבת ההגנה: אימות החתימה
+    if not verify_sms_signature(timestamp, signature, SMS_SECRET):
+        print(f"⚠️ BLOCKED: Invalid SMS signature from {sender}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Invalid security signature"
+        )
+        
+    print(f"✅ SECURE SMS RECEIVED from {sender}: {content}")
+    
+    # 2. העברה לשכבת הלוגיקה וה-AI
+    # כאן נקרא ל-Service הקיים שלך כדי לעבד את ההודעה מול LangGraph. לדוגמה:
+    # await graph_service.process_incoming_message(sender, content, channel="sms")
+    
+    return {"status": "ok"}
