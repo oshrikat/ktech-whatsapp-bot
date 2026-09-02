@@ -17,7 +17,6 @@ def escalate_to_human(customer_phone: str, summary: str) -> str:
     
     # ניסוח ההודעה שתישלח לאבא שלך
     alert_message = (
-        "ניסוי - בדיקה בלבד : \n\n"
         "🚨 *התראת שירות מבוט K-Tech!* 🚨\n\n"
         "לקוח דורש מענה אנושי / הסלמה.\n"
         f"📱 *מספר הלקוח:* {customer_phone}\n"

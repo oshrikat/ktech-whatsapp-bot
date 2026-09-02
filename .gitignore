@@ -1,4 +1,5 @@
 .env
 venv/
 scripts/
+Scripts/
 Oracle_Keys/
