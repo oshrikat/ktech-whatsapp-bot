@@ -2,6 +2,10 @@ from fastapi import APIRouter, Request, HTTPException, Response, BackgroundTasks
 from services.graph_service import ktech_bot_graph
 from services.whatsapp_service import whatsapp_sender
 import os
+import urllib.parse
+import hmac
+import hashlib
+import base64
 
 router = APIRouter(prefix="/webhook", tags=["WhatsApp Webhook"])
 
