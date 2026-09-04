@@ -95,29 +95,32 @@ async def receive_message(request: Request, background_tasks: BackgroundTasks):
         return {"status": "error"}
 
 def verify_sms_signature(timestamp: str, signature: str, secret: str) -> bool:
-    """פונקציה לאימות חתימת HMAC של SmsForwarder"""
+    """פונקציה לאימות חתימת HMAC של SmsForwarder עם מיקרוסקופ לדיבאג"""
     try:
+        # פתרון הקונספירציה! מנקים את הקידוד של האפליקציה (%2F הופך ל- /)
+        clean_signature = urllib.parse.unquote(signature)
+        
         # יצירת המחרוזת לחתימה לפי התקן של האפליקציה
         message = f"{timestamp}\n{secret}".encode('utf-8')
         secret_bytes = secret.encode('utf-8')
         
-        # חישוב החתימה הדיגיטלית
+        # חישוב החתימה הדיגיטלית בשרת
         signature_mac = hmac.new(secret_bytes, message, digestmod=hashlib.sha256).digest()
         expected_signature = base64.b64encode(signature_mac).decode('utf-8')
-
+        
         # --- 🔍 תחילת המיקרוסקופ 🔍 ---
         print("\n" + "🔍"*20)
         print("MICROSCOPE DEBUG - HMAC SIGNATURE")
         print(f"1. Timestamp received : '{timestamp}'")
         print(f"2. Secret used        : '{secret}'")
-        print(f"3. String to hash     : '{timestamp}\\n{secret}'")
-        print(f"4. Signature from app : '{signature}'")
+        print(f"3. Raw app signature  : '{signature}'")
+        print(f"4. Clean app signature: '{clean_signature}'")
         print(f"5. Server calculated  : '{expected_signature}'")
         print("🔍"*20 + "\n")
         # --- 🔍 סוף המיקרוסקופ 🔍 ---
-
-        # השוואה בטוחה של החתימות
-        return hmac.compare_digest(expected_signature, signature)
+        
+        # השוואה בטוחה של החתימות (משווים לחתימה הנקייה!)
+        return hmac.compare_digest(expected_signature, clean_signature)
     except Exception as e:
         print(f"Error verifying signature: {e}")
         return False
