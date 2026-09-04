@@ -26,14 +26,25 @@ class SmsService:
 
     async def send_sms_reply(self, target_phone: str, message: str):
         """שולח בקשת HTTP לשרת הפנימי של טלפון קייטק כדי שישגר SMS"""
+        # משתמשים בפורמט שהאפליקציה דורשת, תוך וידוא שסוג הנתונים מוגדר היטב
         payload = {
             "sim_slot": 1,
             "phone_numbers": target_phone,
             "msg_content": message
         }
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(self.phone_api_url, json=payload, timeout=10.0)
+                # לפעמים האפליקציה מצפה ל-Data ולא ל-Json, נתחיל עם Json תקני עם Headers
+                response = await client.post(
+                    self.phone_api_url, 
+                    json=payload, 
+                    headers=headers,
+                    timeout=10.0
+                )
                 if response.status_code == 200:
                     print(f"✅ Outbound SMS sent successfully to {target_phone} via K-Tech Phone")
                 else:
