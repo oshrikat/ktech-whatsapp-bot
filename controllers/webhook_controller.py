@@ -1,11 +1,9 @@
-from fastapi import APIRouter, Request, HTTPException, Response, BackgroundTasks , status
+from fastapi import APIRouter, Request, HTTPException, Response, BackgroundTasks, status
+import urllib.parse
 from services.graph_service import ktech_bot_graph
 from services.whatsapp_service import whatsapp_sender
 import os
-import urllib.parse
-import hmac
-import hashlib
-import base64
+from services.sms_service import sms_manager
 
 router = APIRouter(prefix="/webhook", tags=["WhatsApp Webhook"])
 
@@ -126,21 +124,18 @@ def verify_sms_signature(timestamp: str, signature: str, secret: str) -> bool:
         return False
 
 @router.post("/sms/inbound")
-async def receive_sms(request: Request):
-    """נקודת קצה לקליטת הודעות SMS ממכשיר ה-Gateway"""
+async def receive_sms(request: Request, background_tasks: BackgroundTasks):
+    """קליטת SMS מטלפון קייטק והעברה לעיבוד ברקע (למניעת כפילויות)"""
     raw_body = await request.body()
-    raw_str = raw_body.decode('utf-8')
-    
-    # פירוק המידע המקודד
-    parsed_data = urllib.parse.parse_qs(raw_str)
+    parsed_data = urllib.parse.parse_qs(raw_body.decode('utf-8'))
     
     sender = parsed_data.get('from', ['Unknown'])[0]
     content = parsed_data.get('content', ['No content'])[0]
     timestamp = parsed_data.get('timestamp', [''])[0]
     signature = parsed_data.get('sign', [''])[0]
     
-    # 1. שכבת ההגנה: אימות החתימה
-    if not verify_sms_signature(timestamp, signature, SMS_SECRET):
+    # 1. אימות חתימה קריפטוגרפית (HMAC) דרך השירות
+    if not sms_manager.verify_signature(timestamp, signature):
         print(f"⚠️ BLOCKED: Invalid SMS signature from {sender}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
@@ -149,8 +144,8 @@ async def receive_sms(request: Request):
         
     print(f"✅ SECURE SMS RECEIVED from {sender}: {content}")
     
-    # 2. העברה לשכבת הלוגיקה וה-AI
-    # כאן נקרא ל-Service הקיים שלך כדי לעבד את ההודעה מול LangGraph. לדוגמה:
-    # await graph_service.process_incoming_message(sender, content, channel="sms")
+    # 2. שולחים את עבודת ה-AI לרקע, ומשחררים את טלפון קייטק מיד!
+    background_tasks.add_task(sms_manager.process_incoming_sms, sender, content)
     
     return {"status": "ok"}
+
