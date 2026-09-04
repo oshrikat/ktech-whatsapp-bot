@@ -104,7 +104,18 @@ def verify_sms_signature(timestamp: str, signature: str, secret: str) -> bool:
         # חישוב החתימה הדיגיטלית
         signature_mac = hmac.new(secret_bytes, message, digestmod=hashlib.sha256).digest()
         expected_signature = base64.b64encode(signature_mac).decode('utf-8')
-        
+
+        # --- 🔍 תחילת המיקרוסקופ 🔍 ---
+        print("\n" + "🔍"*20)
+        print("MICROSCOPE DEBUG - HMAC SIGNATURE")
+        print(f"1. Timestamp received : '{timestamp}'")
+        print(f"2. Secret used        : '{secret}'")
+        print(f"3. String to hash     : '{timestamp}\\n{secret}'")
+        print(f"4. Signature from app : '{signature}'")
+        print(f"5. Server calculated  : '{expected_signature}'")
+        print("🔍"*20 + "\n")
+        # --- 🔍 סוף המיקרוסקופ 🔍 ---
+
         # השוואה בטוחה של החתימות
         return hmac.compare_digest(expected_signature, signature)
     except Exception as e:
