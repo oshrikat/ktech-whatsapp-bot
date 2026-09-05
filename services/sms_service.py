@@ -2,6 +2,7 @@ import hmac
 import hashlib
 import base64
 import urllib.parse
+import time
 import httpx
 from services.graph_service import ktech_bot_graph
 from dtos.sms_dto import OutboundSmsDTO
@@ -24,44 +25,56 @@ class SmsService:
             return False
 
     async def send_sms_reply(self, target_phone: str, message: str):
-        # סידור המספר לפורמט ישראלי רגיל (עובד הכי טוב עם אנדרואיד)
+        # 1. סידור מספר הטלפון לפורמט מקומי
         local_phone = target_phone
         if local_phone.startswith("+972"):
             local_phone = "0" + local_phone[4:]
         elif local_phone.startswith("972"):
             local_phone = "0" + local_phone[3:]
-            
-        # שימוש ב-Query Parameters - הדרך הכי בסיסית ויציבה לשרתי IoT/Java
-        params = {
-            "phone_numbers": local_phone,
-            "msg_content": message
+
+        # 2. שימוש ב-DTO הארכיטקטוני שלנו למידע הפנימי
+        sms_data = OutboundSmsDTO(
+            sim_slot=1,
+            phone_numbers=local_phone,
+            msg_content=message
+        )
+
+        # 3. עטיפת ה-DTO בתבנית ה"זהב" שהרגע פיצחנו
+        payload = {
+            "data": sms_data.model_dump(),
+            "timestamp": int(time.time() * 1000),
+            "sign": ""
         }
-        
+
+        headers = {
+            "Content-Type": "application/json; charset=utf-8"
+        }
+
         try:
             async with httpx.AsyncClient() as client:
-                # שינוי ל-GET במקום POST, עוקף בעיות קידוד גוף הבקשה
-                response = await client.get(
+                response = await client.post(
                     self.phone_api_url, 
-                    params=params,
+                    json=payload,
+                    headers=headers,
                     timeout=10.0
                 )
                 
-                if response.status_code == 200:
-                    print(f"✅ Command accepted by phone for {local_phone}")
+                # האפליקציה מחזירה code: 200 כשהכל תקין
+                if response.status_code == 200 and "success" in response.text.lower():
+                    print(f"✅ Outbound SMS sent successfully to {local_phone}")
                 else:
-                    print(f"❌ Failed to send. Status: {response.status_code}. Response: {response.text}")
+                    print(f"❌ Failed to send SMS. Status: {response.status_code}, Response: {response.text}")
         except Exception as e:
             print(f"❌ Error communicating with Phone API: {e}")
 
     async def process_incoming_sms(self, sender_phone: str, message_body: str):
-        # 2. ניקוי הלכלוך שהאפליקציה מוסיפה להודעה הנכנסת (SIM1_ וכו')
         clean_msg = message_body.split('SIM1_')[0].strip()
         print(f"🧠 Routing SMS from {sender_phone} to AI Graph. Clean msg: '{clean_msg}'")
         
         try:
             config = {"configurable": {"thread_id": f"sms_{sender_phone}"}}
             
-            # 3. הוספת הנחיה "מאחורי הקלעים" ל-AI כדי שיענה קצר וקולע ל-SMS
+            # הנחיה ל-AI לענות קצר וקולע ב-SMS
             ai_input = f"{clean_msg}\n\n[SYSTEM NOTE: The user is messaging via SMS. Your response MUST be extremely short, maximum 1 or 2 sentences, under 100 characters. No markdown, no long lists.]"
             
             graph_response = ktech_bot_graph.invoke({
