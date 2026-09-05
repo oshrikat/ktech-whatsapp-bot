@@ -24,32 +24,32 @@ class SmsService:
             return False
 
     async def send_sms_reply(self, target_phone: str, message: str):
-        # 1. סידור מספר הטלפון לפורמט מקומי לאנדרואיד (הסרת +972)
+        # סידור המספר לפורמט ישראלי רגיל (עובד הכי טוב עם אנדרואיד)
         local_phone = target_phone
         if local_phone.startswith("+972"):
             local_phone = "0" + local_phone[4:]
         elif local_phone.startswith("972"):
             local_phone = "0" + local_phone[3:]
             
-        sms_request = OutboundSmsDTO(
-            sim_slot=1,
-            phone_numbers=local_phone,
-            msg_content=message
-        )
+        # שימוש ב-Query Parameters - הדרך הכי בסיסית ויציבה לשרתי IoT/Java
+        params = {
+            "phone_numbers": local_phone,
+            "msg_content": message
+        }
         
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(
+                # שינוי ל-GET במקום POST, עוקף בעיות קידוד גוף הבקשה
+                response = await client.get(
                     self.phone_api_url, 
-                    data=sms_request.model_dump(),
+                    params=params,
                     timeout=10.0
                 )
                 
                 if response.status_code == 200:
-                    print(f"✅ Outbound SMS sent successfully to {local_phone}")
+                    print(f"✅ Command accepted by phone for {local_phone}")
                 else:
-                    print(f"❌ Failed to send SMS. Phone returned status: {response.status_code}")
-                    print(f"Response details: {response.text}")
+                    print(f"❌ Failed to send. Status: {response.status_code}. Response: {response.text}")
         except Exception as e:
             print(f"❌ Error communicating with Phone API: {e}")
 
