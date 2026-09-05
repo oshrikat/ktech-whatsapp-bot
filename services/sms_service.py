@@ -4,12 +4,12 @@ import base64
 import urllib.parse
 import httpx
 from services.graph_service import ktech_bot_graph
+from dtos.sms_dto import OutboundSmsDTO
 
 class SmsService:
     def __init__(self):
         self.secret = "ktech_secret_2026"
-        # ה ip מתוך האפליקציה tail של הטלפון קייטק
-        self.phone_api_url = "http://100.86.10.117:5000/sms/send" 
+        self.phone_api_url = "http://100.86.10.117:5000/sms/send" # IP של הטלפון
 
     def verify_signature(self, timestamp: str, signature: str) -> bool:
         """אימות מאובטח של החתימה (המיקרוסקופ הוסר, נשאר רק הקוד שעובד חלק)"""
@@ -25,33 +25,32 @@ class SmsService:
             return False
 
     async def send_sms_reply(self, target_phone: str, message: str):
-        """שולח בקשת HTTP לשרת הפנימי של טלפון קייטק כדי שישגר SMS"""
-        # משתמשים בפורמט שהאפליקציה דורשת, תוך וידוא שסוג הנתונים מוגדר היטב
-        payload = {
-            "sim_slot": 1,
-            "phone_numbers": target_phone,
-            "msg_content": message
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
+        """משגר פקודת HTTP לטלפון באמצעות DTO ו-Form-Data"""
+        
+        # 1. אריזת הנתונים לתוך ה-DTO באופן בטוח
+        sms_request = OutboundSmsDTO(
+            sim_slot=1,
+            phone_numbers=target_phone,
+            msg_content=message
+        )
+        
         try:
             async with httpx.AsyncClient() as client:
-                # לפעמים האפליקציה מצפה ל-Data ולא ל-Json, נתחיל עם Json תקני עם Headers
+                # 2. שימוש ב-data= במקום ב-json= כדי לשלוח כ-Form-Encoded
                 response = await client.post(
                     self.phone_api_url, 
-                    json=payload, 
-                    headers=headers,
+                    data=sms_request.model_dump(),  # המרת ה-DTO למילון
                     timeout=10.0
                 )
+                
                 if response.status_code == 200:
-                    print(f"✅ Outbound SMS sent successfully to {target_phone} via K-Tech Phone")
+                    print(f"✅ Outbound SMS sent successfully to {target_phone}")
                 else:
                     print(f"❌ Failed to send SMS. Phone returned status: {response.status_code}")
                     print(f"Response details: {response.text}")
+                    
         except Exception as e:
-            print(f"❌ Error communicating with K-Tech Phone API: {e}")
+            print(f"❌ Error communicating with Phone API: {e}")
 
     async def process_incoming_sms(self, sender_phone: str, message_body: str):
         """העברת ההודעה ל-LangGraph ושליחת התשובה חזרה"""

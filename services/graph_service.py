@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 import os
 from langgraph.checkpoint.upstash_redis import UpstashRedisSaver
-from dtos.chat_state import ChatState
+from dtos.chat_state_DTO import ChatState
 from services.ai_service import generate_ai_response, summarize_conversation
 
 checkpointer = UpstashRedisSaver.from_env()
