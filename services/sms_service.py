@@ -9,10 +9,9 @@ from dtos.sms_dto import OutboundSmsDTO
 class SmsService:
     def __init__(self):
         self.secret = "ktech_secret_2026"
-        self.phone_api_url = "http://100.86.10.117:5000/sms/send" # IP של הטלפון
+        self.phone_api_url = "http://100.86.10.117:5000/sms/send"
 
     def verify_signature(self, timestamp: str, signature: str) -> bool:
-        """אימות מאובטח של החתימה (המיקרוסקופ הוסר, נשאר רק הקוד שעובד חלק)"""
         try:
             clean_signature = urllib.parse.unquote(signature)
             message = f"{timestamp}\n{self.secret}".encode('utf-8')
@@ -25,50 +24,56 @@ class SmsService:
             return False
 
     async def send_sms_reply(self, target_phone: str, message: str):
-        """משגר פקודת HTTP לטלפון באמצעות DTO ו-Form-Data"""
-        
-        # 1. אריזת הנתונים לתוך ה-DTO באופן בטוח
+        # 1. סידור מספר הטלפון לפורמט מקומי לאנדרואיד (הסרת +972)
+        local_phone = target_phone
+        if local_phone.startswith("+972"):
+            local_phone = "0" + local_phone[4:]
+        elif local_phone.startswith("972"):
+            local_phone = "0" + local_phone[3:]
+            
         sms_request = OutboundSmsDTO(
             sim_slot=1,
-            phone_numbers=target_phone,
+            phone_numbers=local_phone,
             msg_content=message
         )
         
         try:
             async with httpx.AsyncClient() as client:
-                # 2. שימוש ב-data= במקום ב-json= כדי לשלוח כ-Form-Encoded
                 response = await client.post(
                     self.phone_api_url, 
-                    data=sms_request.model_dump(),  # המרת ה-DTO למילון
+                    data=sms_request.model_dump(),
                     timeout=10.0
                 )
                 
                 if response.status_code == 200:
-                    print(f"✅ Outbound SMS sent successfully to {target_phone}")
+                    print(f"✅ Outbound SMS sent successfully to {local_phone}")
                 else:
                     print(f"❌ Failed to send SMS. Phone returned status: {response.status_code}")
                     print(f"Response details: {response.text}")
-                    
         except Exception as e:
             print(f"❌ Error communicating with Phone API: {e}")
 
     async def process_incoming_sms(self, sender_phone: str, message_body: str):
-        """העברת ההודעה ל-LangGraph ושליחת התשובה חזרה"""
-        print(f"🧠 Routing SMS from {sender_phone} to AI Graph...")
+        # 2. ניקוי הלכלוך שהאפליקציה מוסיפה להודעה הנכנסת (SIM1_ וכו')
+        clean_msg = message_body.split('SIM1_')[0].strip()
+        print(f"🧠 Routing SMS from {sender_phone} to AI Graph. Clean msg: '{clean_msg}'")
+        
         try:
             config = {"configurable": {"thread_id": f"sms_{sender_phone}"}}
+            
+            # 3. הוספת הנחיה "מאחורי הקלעים" ל-AI כדי שיענה קצר וקולע ל-SMS
+            ai_input = f"{clean_msg}\n\n[SYSTEM NOTE: The user is messaging via SMS. Your response MUST be extremely short, maximum 1 or 2 sentences, under 100 characters. No markdown, no long lists.]"
+            
             graph_response = ktech_bot_graph.invoke({
-                "current_input": message_body, 
+                "current_input": ai_input, 
                 "phone_number": sender_phone  
             }, config)
             
             bot_reply = graph_response["messages"][-1]["content"]
             print(f"🤖 AI SMS REPLY READY:\n{bot_reply}")
             
-            print("📤 Sending reply back to the user via SMS...")
             await self.send_sms_reply(sender_phone, bot_reply)
         except Exception as e:
             print(f"❌ Error processing AI logic for SMS: {e}")
 
-# מופע יחיד שישמש את הראוטר
 sms_manager = SmsService()
